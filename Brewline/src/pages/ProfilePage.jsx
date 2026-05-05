@@ -187,7 +187,7 @@ function ProfilePage() {
     }
   }, [setUser])
 
-  const userDisplayName = getUserDisplayName(user) || 'Brewline User'
+  const userDisplayName = getUserDisplayName(user) || 'Tradely User'
   const fullName = buildFullName(user) || 'Not added yet'
   const hasChanges = EDITABLE_FIELDS.some((field) => (form[field] || '') !== (user?.[field] || ''))
   const pickerStyle = form.avatar_style || DEFAULT_PICKER_STYLE
@@ -312,7 +312,7 @@ function ProfilePage() {
                 Shape a profile that feels polished, recognizable, and unmistakably yours.
               </h1>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-text-muted)] sm:text-base">
-                Update your public identity, refine how your name appears across Brewline, and tune your avatar into something that feels premium instead of placeholder.
+                Update your public identity, refine how your name appears across Tradely, and tune your avatar into something that feels premium instead of placeholder.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <div className="rounded-full border border-[rgba(117,73,42,0.14)] bg-[rgba(255,251,246,0.72)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-primary-deep)]">
@@ -344,7 +344,7 @@ function ProfilePage() {
                     {form.display_name.trim() || userDisplayName}
                   </p>
                   <p className="mt-1 truncate text-sm text-[var(--color-text-muted)]">
-                    @{user?.username || 'brewline-user'}
+                    @{user?.username || 'tradely-user'}
                   </p>
                   <p className="mt-2 truncate text-xs text-[var(--color-text-muted)]">
                     DiceBear {pickerStyle} with seed {activeSeed}
@@ -371,7 +371,7 @@ function ProfilePage() {
                     {userDisplayName}
                   </p>
                   <p className="mt-1 truncate text-sm text-[var(--color-text-muted)]">
-                    {user?.email || 'team@brewline.app'}
+                    {user?.email || 'team@tradely.app'}
                   </p>
                   <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
                     Member since {joinedDate}
@@ -453,7 +453,7 @@ function ProfilePage() {
                       name="display_name"
                       value={form.display_name}
                       onChange={handleChange}
-                      placeholder="How your name appears in Brewline"
+                      placeholder="How your name appears in Tradely"
                     />
                     <div className="hidden md:block" />
                     <Input

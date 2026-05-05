@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { BellIcon, SearchIcon } from '../../lib/icons'
-import { fetchNotifications, markNotificationRead } from '../../services/alertService'
 import { getUserAvatarUrl, getUserDisplayName } from '../../utils/userProfile'
+import { useNotificationsStore } from '../../store/notificationsStore'
 import Avatar from '../ui/Avatar'
 import SearchBar from '../SearchBar'
 
 function Navbar({ query, onQueryChange, user, onLogout }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [notifications, setNotifications] = useState([])
-  const [unreadCount, setUnreadCount] = useState(0)
   const [busyNotificationId, setBusyNotificationId] = useState(null)
   const panelRef = useRef(null)
-  const userDisplayName = getUserDisplayName(user) || 'Brewline User'
+  const notifications = useNotificationsStore((state) => state.notifications)
+  const unreadCount = useNotificationsStore((state) => state.unreadCount)
+  const userDisplayName = getUserDisplayName(user) || 'Tradely User'
   const userAvatarUrl = getUserAvatarUrl(user)
 
   useEffect(() => {
@@ -37,34 +37,6 @@ function Navbar({ query, onQueryChange, user, onLogout }) {
   }, [isMenuOpen])
 
   useEffect(() => {
-    let isMounted = true
-
-    async function loadNotifications() {
-      try {
-        const response = await fetchNotifications()
-
-        if (!isMounted) {
-          return
-        }
-
-        setNotifications(response.results)
-        setUnreadCount(response.unreadCount)
-      } catch {
-        if (isMounted) {
-          setNotifications([])
-          setUnreadCount(0)
-        }
-      }
-    }
-
-    loadNotifications()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
-
-  useEffect(() => {
     document.body.style.overflow = isMenuOpen ? 'hidden' : ''
 
     return () => {
@@ -85,14 +57,7 @@ function Navbar({ query, onQueryChange, user, onLogout }) {
     setBusyNotificationId(notificationId)
 
     try {
-      const nextNotification = await markNotificationRead(notificationId)
-
-      setNotifications((current) =>
-        current.map((notification) =>
-          notification.id === notificationId ? nextNotification : notification,
-        ),
-      )
-      setUnreadCount((current) => Math.max(0, current - 1))
+      await useNotificationsStore.getState().markRead(notificationId)
     } finally {
       setBusyNotificationId(null)
     }
@@ -105,14 +70,14 @@ function Navbar({ query, onQueryChange, user, onLogout }) {
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--color-primary-deep)] text-[var(--color-primary-light)] shadow-[0_12px_30px_rgba(139,94,60,0.24)]">
-                <span className="text-lg font-semibold">B</span>
+                <span className="text-lg font-semibold">T</span>
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-text-muted)]">
-                  Brewline
+                  Tradely
                 </p>
                 <h1 className="truncate text-xl font-semibold tracking-tight text-[var(--color-primary-deep)]">
-                  Stock Chat Dashboard
+                  Trade. Talk. React
                 </h1>
               </div>
             </div>
@@ -176,7 +141,7 @@ function Navbar({ query, onQueryChange, user, onLogout }) {
                   {userDisplayName}
                 </p>
                 <p className="max-w-40 truncate text-xs text-[var(--color-text-muted)]">
-                  {user?.email || 'team@brewline.app'}
+                  {user?.email || 'team@tradely.app'}
                 </p>
               </div>
             </button>
@@ -234,7 +199,7 @@ function Navbar({ query, onQueryChange, user, onLogout }) {
                     {userDisplayName}
                   </p>
                   <p className="truncate text-sm text-[var(--color-text-muted)]">
-                    {user?.email || 'team@brewline.app'}
+                    {user?.email || 'team@tradely.app'}
                   </p>
                 </div>
               </div>

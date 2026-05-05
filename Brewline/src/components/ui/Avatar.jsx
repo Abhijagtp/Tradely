@@ -1,4 +1,5 @@
 import { clsx } from 'clsx'
+import { useEffect, useState } from 'react'
 import { getInitialsFromDisplayName } from '../../utils/userProfile'
 
 const sizeClasses = {
@@ -19,12 +20,18 @@ function Avatar({
 }) {
   const initials = getInitialsFromDisplayName(displayName)
   const resolvedSizeClass = sizeClasses[size] || sizeClasses.md
+  const [hasImageError, setHasImageError] = useState(false)
 
-  if (avatarUrl) {
+  useEffect(() => {
+    setHasImageError(false)
+  }, [avatarUrl])
+
+  if (avatarUrl && !hasImageError) {
     return (
       <img
         src={avatarUrl}
         alt={displayName ? `${displayName} avatar` : 'User avatar'}
+        onError={() => setHasImageError(true)}
         className={clsx('shrink-0 object-cover', resolvedSizeClass, className, imageClassName)}
       />
     )

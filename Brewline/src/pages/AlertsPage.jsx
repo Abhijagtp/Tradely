@@ -5,10 +5,9 @@ import {
 import {
   checkStockAlert,
   deleteStockAlert,
-  fetchNotifications,
   fetchStockAlerts,
-  markNotificationRead,
 } from '../services/alertService'
+import { useNotificationsStore } from '../store/notificationsStore'
 
 function formatDateTime(value) {
   if (!value) {
@@ -32,45 +31,43 @@ function formatTriggerLabel(triggerType, targetPrice) {
 
 function AlertsPage() {
   const [alerts, setAlerts] = useState([])
-  const [notifications, setNotifications] = useState([])
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isAlertsLoading, setIsAlertsLoading] = useState(true)
   const [error, setError] = useState('')
   const [busyAlertId, setBusyAlertId] = useState(null)
   const [busyNotificationId, setBusyNotificationId] = useState(null)
+  const notifications = useNotificationsStore((state) => state.notifications)
+  const unreadCount = useNotificationsStore((state) => state.unreadCount)
+  const isNotificationsLoading = useNotificationsStore((state) => state.isLoading)
+  const notificationsError = useNotificationsStore((state) => state.error)
 
   useEffect(() => {
     let isMounted = true
 
     async function loadData() {
-      setIsLoading(true)
+      setIsAlertsLoading(true)
       setError('')
 
       try {
-        const [alertsResponse, notificationsResponse] = await Promise.all([
-          fetchStockAlerts(),
-          fetchNotifications(),
-        ])
+        const alertsResponse = await fetchStockAlerts()
 
         if (!isMounted) {
           return
         }
 
         setAlerts(alertsResponse.results)
-        setNotifications(notificationsResponse.results)
-        setUnreadCount(notificationsResponse.unreadCount)
       } catch {
         if (isMounted) {
           setError('Alerts could not be loaded right now.')
         }
       } finally {
         if (isMounted) {
-          setIsLoading(false)
+          setIsAlertsLoading(false)
         }
       }
     }
 
     loadData()
+    useNotificationsStore.getState().fetchInbox({ silent: false })
 
     return () => {
       isMounted = false
@@ -113,14 +110,7 @@ function AlertsPage() {
     setError('')
 
     try {
-      const nextNotification = await markNotificationRead(notificationId)
-
-      setNotifications((current) =>
-        current.map((notification) =>
-          notification.id === notificationId ? nextNotification : notification,
-        ),
-      )
-      setUnreadCount((current) => Math.max(0, current - 1))
+      await useNotificationsStore.getState().markRead(notificationId)
     } catch {
       setError('Notification could not be marked as read right now.')
     } finally {
@@ -156,6 +146,12 @@ function AlertsPage() {
           </div>
         ) : null}
 
+        {notificationsError && !error ? (
+          <div className="mt-6 rounded-[1.3rem] border border-[rgba(139,94,60,0.16)] bg-[rgba(255,250,245,0.8)] px-4 py-3 text-sm text-[var(--color-primary-deep)] shadow-sm">
+            {notificationsError}
+          </div>
+        ) : null}
+
         <section className="mt-8 grid gap-6 xl:grid-cols-[0.58fr_0.42fr]">
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
@@ -172,7 +168,7 @@ function AlertsPage() {
               </span>
             </div>
 
-            {isLoading ? (
+            {isAlertsLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 3 }).map((_, index) => (
                   <div
@@ -262,7 +258,7 @@ function AlertsPage() {
               </span>
             </div>
 
-            {isLoading ? (
+            {isNotificationsLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 3 }).map((_, index) => (
                   <div

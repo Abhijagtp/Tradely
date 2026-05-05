@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import Avatar from '../components/ui/Avatar'
 import {
   createStockAlert,
@@ -11,6 +11,7 @@ import {
   createChatSocket,
   fetchChatRoom,
   fetchChatRoomMessages,
+  fetchChatRoomSuggestions,
   followChatRoom,
   sendChatRoomMessage,
   sendChatSocketMessage,
@@ -55,6 +56,113 @@ function getApiErrorMessage(error, fallbackMessage) {
   }
 
   return fallbackMessage
+}
+
+function getActiveStockToken(value, caretPosition) {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const safeCaretPosition = Math.max(0, Math.min(caretPosition ?? value.length, value.length))
+  const left = value.slice(0, safeCaretPosition)
+  const tokenMatch = left.match(/(^|\s)(\$[A-Za-z0-9_]*)$/)
+
+  if (!tokenMatch) {
+    return null
+  }
+
+  const token = tokenMatch[2]
+  const start = safeCaretPosition - token.length
+
+  return {
+    token,
+    start,
+    end: safeCaretPosition,
+  }
+}
+
+function renderMessageContent(content, stockReferences, isOwnMessage, navigate) {
+  if (!content) {
+    return null
+  }
+
+  if (!Array.isArray(stockReferences) || !stockReferences.length) {
+    return <p>{content}</p>
+  }
+
+  const orderedReferences = [...stockReferences]
+    .filter((reference) =>
+      Number.isInteger(reference.start) &&
+      Number.isInteger(reference.end) &&
+      reference.start >= 0 &&
+      reference.end > reference.start &&
+      reference.end <= content.length &&
+      reference.token,
+    )
+    .sort((left, right) => left.start - right.start)
+
+  if (!orderedReferences.length) {
+    return <p>{content}</p>
+  }
+
+  const segments = []
+  let cursor = 0
+
+  orderedReferences.forEach((reference, index) => {
+    if (reference.start < cursor) {
+      return
+    }
+
+    if (cursor < reference.start) {
+      segments.push({
+        type: 'text',
+        value: content.slice(cursor, reference.start),
+        key: `text-${index}-${cursor}`,
+      })
+    }
+
+    segments.push({
+      type: 'stock',
+      value: content.slice(reference.start, reference.end),
+      symbol: reference.symbol,
+      key: `stock-${reference.symbol}-${reference.start}-${reference.end}`,
+    })
+
+    cursor = reference.end
+  })
+
+  if (cursor < content.length) {
+    segments.push({
+      type: 'text',
+      value: content.slice(cursor),
+      key: `text-tail-${cursor}`,
+    })
+  }
+
+  return (
+    <p>
+      {segments.map((segment) => {
+        if (segment.type === 'text') {
+          return <span key={segment.key}>{segment.value}</span>
+        }
+
+        return (
+          <button
+            key={segment.key}
+            type="button"
+            onClick={() => navigate(`/chat/${segment.symbol}`)}
+            className={`mx-0.5 inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold transition ${
+              isOwnMessage
+                ? 'border-[rgba(255,247,235,0.34)] bg-[rgba(255,247,235,0.12)] text-[var(--color-primary-light)] hover:bg-[rgba(255,247,235,0.18)]'
+                : 'border-[rgba(167,120,72,0.22)] bg-[rgba(245,230,211,0.52)] text-[var(--color-primary-deep)] hover:bg-[rgba(245,230,211,0.8)]'
+            }`}
+          >
+            {segment.value}
+          </button>
+        )
+      })}
+    </p>
+  )
 }
 
 function AlertModal({
@@ -157,6 +265,7 @@ function AlertModal({
 
 function ChatPage() {
   const { symbol } = useParams()
+  const navigate = useNavigate()
   const normalizedSymbol = symbol?.toUpperCase() || ''
   const user = useAuthStore((state) => state.user)
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
@@ -177,6 +286,10 @@ function ChatPage() {
   const [roomAlerts, setRoomAlerts] = useState([])
   const [editingAlertId, setEditingAlertId] = useState(null)
   const [isDeletingAlertId, setIsDeletingAlertId] = useState(null)
+  const [mentionSuggestions, setMentionSuggestions] = useState([])
+  const [isMentionLoading, setIsMentionLoading] = useState(false)
+  const [activeMentionIndex, setActiveMentionIndex] = useState(0)
+  const [mentionContext, setMentionContext] = useState(null)
   const [alertForm, setAlertForm] = useState({
     triggerType: 'price_above',
     targetPrice: '',
@@ -185,6 +298,7 @@ function ChatPage() {
   })
   const messagesEndRef = useRef(null)
   const socketRef = useRef(null)
+  const composerRef = useRef(null)
 
   const canSend = isAuthenticated && Boolean(accessToken) && draft.trim() && !isSending
   const hasSocketAccess = Boolean(normalizedSymbol && accessToken && isAuthenticated)
@@ -197,6 +311,47 @@ function ChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    if (!mentionContext?.token || !isAuthenticated) {
+      setMentionSuggestions([])
+      setIsMentionLoading(false)
+      setActiveMentionIndex(0)
+      return undefined
+    }
+
+    let isMounted = true
+
+    setIsMentionLoading(true)
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await fetchChatRoomSuggestions(mentionContext.token, 5)
+
+        if (!isMounted) {
+          return
+        }
+
+        setMentionSuggestions(response.results)
+        setActiveMentionIndex(0)
+      } catch {
+        if (!isMounted) {
+          return
+        }
+
+        setMentionSuggestions([])
+      } finally {
+        if (isMounted) {
+          setIsMentionLoading(false)
+        }
+      }
+    }, 180)
+
+    return () => {
+      isMounted = false
+      window.clearTimeout(timeoutId)
+    }
+  }, [isAuthenticated, mentionContext?.token])
 
   useEffect(() => {
     let isMounted = true
@@ -319,7 +474,7 @@ function ChatPage() {
   async function handleSubmit(event) {
     event.preventDefault()
 
-    if (!canSend) {
+    if (!canSend || mentionSuggestions.length) {
       return
     }
 
@@ -356,6 +511,42 @@ function ChatPage() {
   }
 
   function handleComposerKeyDown(event) {
+    if (mentionSuggestions.length) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        setActiveMentionIndex((current) =>
+          current + 1 >= mentionSuggestions.length ? 0 : current + 1,
+        )
+        return
+      }
+
+      if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        setActiveMentionIndex((current) =>
+          current - 1 < 0 ? mentionSuggestions.length - 1 : current - 1,
+        )
+        return
+      }
+
+      if (event.key === 'Enter' || event.key === 'Tab') {
+        const activeSuggestion = mentionSuggestions[activeMentionIndex]
+
+        if (activeSuggestion) {
+          event.preventDefault()
+          applyMentionSuggestion(activeSuggestion)
+          return
+        }
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setMentionSuggestions([])
+        setMentionContext(null)
+        setActiveMentionIndex(0)
+        return
+      }
+    }
+
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
 
@@ -365,6 +556,41 @@ function ChatPage() {
 
       handleSubmit(event)
     }
+  }
+
+  function syncMentionContext(target) {
+    if (!target) {
+      setMentionContext(null)
+      return
+    }
+
+    const nextContext = getActiveStockToken(target.value, target.selectionStart)
+    setMentionContext(nextContext)
+
+    if (!nextContext) {
+      setMentionSuggestions([])
+      setActiveMentionIndex(0)
+    }
+  }
+
+  function applyMentionSuggestion(suggestion) {
+    if (!mentionContext || !composerRef.current) {
+      return
+    }
+
+    const replacementToken = suggestion.token || `$${suggestion.symbol}`
+    const nextDraft = `${draft.slice(0, mentionContext.start)}${replacementToken} ${draft.slice(mentionContext.end)}`
+    const nextCaretPosition = mentionContext.start + replacementToken.length + 1
+
+    setDraft(nextDraft)
+    setMentionSuggestions([])
+    setMentionContext(null)
+    setActiveMentionIndex(0)
+
+    window.requestAnimationFrame(() => {
+      composerRef.current?.focus()
+      composerRef.current?.setSelectionRange(nextCaretPosition, nextCaretPosition)
+    })
   }
 
   async function handleFollowToggle() {
@@ -700,7 +926,12 @@ function ChatPage() {
                                     : 'rounded-bl-[0.45rem] border-[rgba(186,147,105,0.48)] bg-[rgba(255,250,243,0.96)] text-[var(--color-primary-deep)]'
                                 }`}
                               >
-                                <p>{message.content}</p>
+                                {renderMessageContent(
+                                  message.content,
+                                  message.stockReferences,
+                                  isOwnMessage,
+                                  navigate,
+                                )}
                               </article>
                             </div>
 
@@ -753,13 +984,65 @@ function ChatPage() {
                   ) : null}
 
                   <form className="mt-2" onSubmit={handleSubmit}>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 rounded-full border border-[rgba(186,147,105,0.5)] bg-[rgba(255,250,243,0.96)] px-4 py-2 shadow-[0_2px_10px_rgba(139,94,60,0.05)]">
+                    <div className="flex items-end gap-2">
+                      <div className="relative flex-1">
+                        {mentionSuggestions.length || isMentionLoading ? (
+                          <div className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-[1.2rem] border border-[rgba(167,120,72,0.16)] bg-[rgba(255,250,243,0.98)] shadow-[0_12px_30px_rgba(139,94,60,0.12)]">
+                            <div className="border-b border-[rgba(167,120,72,0.12)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">
+                              {isMentionLoading ? 'Finding rooms' : 'Suggested rooms'}
+                            </div>
+                            <div className="max-h-64 overflow-y-auto p-2">
+                              {mentionSuggestions.length ? (
+                                mentionSuggestions.map((suggestion, index) => (
+                                  <button
+                                    key={`${suggestion.symbol}-${suggestion.token}`}
+                                    type="button"
+                                    onMouseDown={(event) => event.preventDefault()}
+                                    onClick={() => applyMentionSuggestion(suggestion)}
+                                    className={`flex w-full items-center justify-between rounded-[1rem] px-3 py-2.5 text-left transition ${
+                                      index === activeMentionIndex
+                                        ? 'bg-[rgba(245,230,211,0.88)]'
+                                        : 'hover:bg-[rgba(245,230,211,0.56)]'
+                                    }`}
+                                  >
+                                    <div>
+                                      <p className="text-sm font-semibold text-[var(--color-primary-deep)]">
+                                        {suggestion.token}
+                                      </p>
+                                      <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                                        {suggestion.name || suggestion.symbol}
+                                      </p>
+                                    </div>
+                                    {suggestion.isFollowing ? (
+                                      <span className="rounded-full border border-[rgba(139,94,60,0.14)] bg-[rgba(255,250,243,0.9)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-primary-deep)]">
+                                        Following
+                                      </span>
+                                    ) : null}
+                                  </button>
+                                ))
+                              ) : (
+                                !isMentionLoading ? (
+                                  <div className="px-3 py-3 text-sm text-[var(--color-text-muted)]">
+                                    No matching stock rooms.
+                                  </div>
+                                ) : null
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        <div className="rounded-full border border-[rgba(186,147,105,0.5)] bg-[rgba(255,250,243,0.96)] px-4 py-2 shadow-[0_2px_10px_rgba(139,94,60,0.05)]">
                         <textarea
+                          ref={composerRef}
                           rows="1"
                           value={draft}
-                          onChange={(event) => setDraft(event.target.value)}
+                          onChange={(event) => {
+                            setDraft(event.target.value)
+                            syncMentionContext(event.target)
+                          }}
                           onKeyDown={handleComposerKeyDown}
+                          onClick={(event) => syncMentionContext(event.target)}
+                          onKeyUp={(event) => syncMentionContext(event.target)}
                           placeholder={
                             isAuthenticated
                               ? 'Share your take...'
@@ -768,10 +1051,11 @@ function ChatPage() {
                           disabled={!isAuthenticated || isSending}
                           className="max-h-20 min-h-[1.35rem] w-full resize-none border-0 bg-transparent py-1 text-sm leading-5 text-[var(--color-primary-deep)] outline-none placeholder:text-[var(--color-text-muted)] disabled:cursor-not-allowed disabled:opacity-60"
                         />
+                        </div>
                       </div>
                       <button
                         type="submit"
-                        disabled={!canSend}
+                        disabled={!canSend || mentionSuggestions.length > 0}
                         aria-label="Send message"
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#8C5A31] text-[var(--color-primary-light)] shadow-[0_4px_12px_rgba(139,94,60,0.16)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
                       >

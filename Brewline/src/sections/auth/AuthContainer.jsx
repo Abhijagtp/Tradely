@@ -6,7 +6,7 @@ import SignupForm from './SignupForm'
 const modeCopy = {
   login: {
     eyebrow: 'Secure session',
-    title: 'Reconnect to Brewline',
+    title: 'Reconnect to Tradely',
     description: 'Initialize your secure session and continue following live market conversations.',
   },
   signup: {
@@ -113,9 +113,9 @@ function AuthContainer({
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[rgba(245,230,211,0.54)]">
-                Brewline
+                Tradely
               </p>
-              <p className="text-sm text-[rgba(245,230,211,0.72)]">Real-time auth channel</p>
+              <p className="text-sm text-[rgba(245,230,211,0.72)]">Trade. Talk. React</p>
             </div>
           </div>
 

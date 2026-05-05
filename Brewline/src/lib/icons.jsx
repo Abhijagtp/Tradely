@@ -27,9 +27,11 @@ export function UserIcon() {
 
 export function SparkChartIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M4 18h16" />
-      <path d="m6 15 4-4 3 2 5-6" />
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <path d="M5 5.5h14" strokeLinecap="round" />
+      <path d="M12 5.5v13" strokeLinecap="round" />
+      <path d="M9 18.5h6" strokeLinecap="round" />
+      <path d="m12 13 3-3 1.5 1.5L20 8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }

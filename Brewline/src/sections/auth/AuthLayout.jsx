@@ -17,7 +17,7 @@ function AuthLayout({ children, mode }) {
             </div>
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-text-muted)]">
-                Brewline
+                  Tradely
               </p>
               <h1 className="text-lg font-semibold tracking-tight text-[var(--color-primary-deep)]">
                 {mode === 'login' ? 'Login to your account' : 'Create your account'}

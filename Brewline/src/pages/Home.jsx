@@ -170,10 +170,10 @@ function Home() {
                 Live now
               </p>
               <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--color-primary-deep)] sm:text-4xl">
-                Discover the busiest stock rooms before the market conversation moves on.
+                Discover the busiest market rooms before the conversation moves on.
               </h1>
               <p className="mt-3 text-sm leading-6 text-[var(--color-text-muted)] sm:text-base">
-                Track trending stocks, jump into live rooms, and scan movers from one calm dashboard built for fast market context.
+                Tradely helps you track trends, join live rooms, and react to price action from one calm dashboard.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">

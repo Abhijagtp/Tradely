@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   BellIcon,
@@ -7,6 +7,8 @@ import {
   HomeIcon,
   ProfileIcon,
 } from '../../lib/icons'
+import { useAuthStore } from '../../store/authStore'
+import { useNotificationsStore } from '../../store/notificationsStore'
 
 const tabs = [
   {
@@ -51,6 +53,7 @@ function getTabState(pathname, tab) {
 
 function MobileNav() {
   const location = useLocation()
+  const unreadCount = useNotificationsStore((state) => state.unreadCount)
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 lg:hidden">
@@ -79,6 +82,11 @@ function MobileNav() {
               >
                 <Icon />
               </span>
+              {tab.to === '/alerts' && unreadCount ? (
+                <span className="absolute right-2 top-2 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-primary-deep)] px-1 text-[9px] font-semibold text-[var(--color-primary-light)]">
+                  {unreadCount}
+                </span>
+              ) : null}
               <span
                 className={`absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-semibold uppercase tracking-[0.18em] transition ${
                   active
@@ -99,6 +107,7 @@ function MobileNav() {
 function DesktopNav() {
   const [openPath, setOpenPath] = useState(null)
   const location = useLocation()
+  const unreadCount = useNotificationsStore((state) => state.unreadCount)
   const isOpen = openPath === location.pathname
 
   return (
@@ -136,6 +145,11 @@ function DesktopNav() {
                 >
                   <Icon />
                 </span>
+                {tab.to === '/alerts' && unreadCount ? (
+                  <span className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-primary-deep)] px-1 text-[9px] font-semibold text-[var(--color-primary-light)]">
+                    {unreadCount}
+                  </span>
+                ) : null}
                 <span className="pointer-events-none absolute right-[calc(100%+0.85rem)] top-1/2 -translate-y-1/2 rounded-full bg-[var(--color-primary-deep)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--color-primary-light)] opacity-0 shadow-[0_10px_20px_rgba(139,94,60,0.18)] transition-all duration-300 group-hover:right-[calc(100%+0.65rem)] group-hover:opacity-100">
                   {tab.label}
                 </span>
@@ -169,6 +183,29 @@ function DesktopNav() {
 }
 
 function AppShell() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const isHydrated = useAuthStore((state) => state.isHydrated)
+  const accessToken = useAuthStore((state) => state.tokens?.access)
+
+  useEffect(() => {
+    const notificationsState = useNotificationsStore.getState()
+
+    if (!isHydrated) {
+      return undefined
+    }
+
+    if (!isAuthenticated || !accessToken) {
+      notificationsState.reset()
+      return undefined
+    }
+
+    notificationsState.initialize()
+
+    return () => {
+      notificationsState.disconnect()
+    }
+  }, [accessToken, isAuthenticated, isHydrated])
+
   return (
     <>
       <div className="min-h-screen pb-28 lg:pb-8">

@@ -43,6 +43,10 @@ export function buildAvatarUrl(style, seed) {
     return ''
   }
 
+  if (style === 'initials') {
+    return ''
+  }
+
   return `https://api.dicebear.com/9.x/${encodeURIComponent(style)}/svg?seed=${encodeURIComponent(seed)}`
 }
 
@@ -55,7 +59,7 @@ export function getAvatarSeedBase(profile) {
     profile?.username ||
     profile?.email?.split('@')[0] ||
     profile?.display_name?.trim() ||
-    'brewline-user'
+    'tradely-user'
   )
 }
 

@@ -43,14 +43,47 @@ function normalizeRoom(room) {
   }
 }
 
+function normalizeRoomSuggestion(room) {
+  return {
+    symbol: room?.symbol || '',
+    token: room?.token || '',
+    name: room?.name || room?.symbol || '',
+    isFollowing: Boolean(room?.is_following),
+    roomApiPath: room?.room_api_path || '',
+    messagesApiPath: room?.messages_api_path || '',
+    websocketPath: room?.websocket_path || '',
+  }
+}
+
 function normalizeMessage(message) {
   const sender = message.sender || message.user || {}
+  const stockReferences = Array.isArray(message.stock_references)
+    ? message.stock_references
+        .map((reference) => ({
+          symbol: reference?.symbol || '',
+          token: reference?.token || '',
+          start: Number(reference?.start ?? -1),
+          end: Number(reference?.end ?? -1),
+          roomApiPath: reference?.room_api_path || '',
+          messagesApiPath: reference?.messages_api_path || '',
+          websocketPath: reference?.websocket_path || '',
+        }))
+        .filter((reference) =>
+          reference.symbol &&
+          reference.token &&
+          Number.isInteger(reference.start) &&
+          Number.isInteger(reference.end) &&
+          reference.start >= 0 &&
+          reference.end > reference.start,
+        )
+    : []
 
   return {
     id: message.id,
     room: message.room,
     roomSymbol: message.room_symbol || null,
     content: message.content || '',
+    stockReferences,
     createdAt: message.created_at || message.timestamp || new Date().toISOString(),
     updatedAt: message.updated_at || null,
     sender: {
@@ -103,6 +136,21 @@ export async function fetchChatRooms() {
 export async function fetchChatRoom(symbol) {
   const { data } = await api.get(`${CHAT_BASE}/rooms/${symbol}/`)
   return normalizeRoom(data)
+}
+
+export async function fetchChatRoomSuggestions(query, limit = 5) {
+  const { data } = await api.get(`${CHAT_BASE}/rooms/suggestions/`, {
+    params: {
+      q: query,
+      limit,
+    },
+  })
+
+  return {
+    query: data?.query || '',
+    count: data?.count ?? 0,
+    results: toArray(data).map(normalizeRoomSuggestion),
+  }
 }
 
 export async function fetchChatRoomMessages(symbol, limit = 50) {
